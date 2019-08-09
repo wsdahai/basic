@@ -1,0 +1,545 @@
+### 多线程学习
+### 计算机缓存一致性协议
+<font color=gray>
+`MESI`（Modified Exclusive Shared Or Invalid）(也称为伊利诺斯协议，是因为该协议由伊利诺斯州立大学提出）是一种广泛使用的支持写回策略的缓存一致性协议。<br/>
+M: 被修改（Modified)<br/>
+E: 独享的（Exclusive)<br/>
+S: 共享的（Shared)<br/>
+I: 无效的（Invalid)<br/>
+</font>
+
+### JMM(java内存模型)
+<font color=gray>
+### **定义:**<br>
+Java内存模型（Java Memory Model ,JMM）就是一种符合内存模型规范的，屏蔽了各种硬件和操作系统的访问差异的，保证了Java程序在各种平台下对内存的访问都能保证效果一致的机制及规范。
+</font>
+### 在硬件层面已经有了缓存一致性协议，为什么还需要volatile？
+>1、并不是所有的硬件架构都提供了相同的一致性保证，Java作为一门跨平台语言，JVM需要提供一个统一的语义。<br/>
+2、操作系统中的缓存和JVM中线程的本地内存并不是一回事，通常我们可以认为：MESI可以解决缓存层面的可见性问题。使用volatile关键字，可以解决JVM层面的可见性问题。<br/>
+3、缓存可见性问题的延伸：由于传统的MESI协议的执行成本比较大。所以CPU通过Store Buffer和Invalidate Queue组件来解决，但是由于这两个组件的引入，也导致缓存和主存之间的通信并不是实时的。也就是说，缓存一致性模型只能保证缓存变更可以保证其他缓存也跟着改变，但是不能保证立刻、马上执行。<br/>
+
+**其实，在计算机内存模型中，也是使用内存屏障来解决缓存的可见性问题的（再次强调：缓存可见性和并发编程中的可见性可以互相类比，但是他们并不是一回事儿）。写内存屏障（Store Memory Barrier）可以促使处理器将当前store buffer（存储缓存）的值写回主存。读内存屏障（Load Memory Barrier）可以促使处理器处理invalidate queue（失效队列）。进而避免由于Store Buffer和Invalidate Queue的非实时性带来的问题。**<br>
+
+
+
+性能测试工具:<br/>
+**postman**:不支持并发测试<br/>
+**apache ab**:命令行测试，支持并发，没有图形化界面：`ab -n 1000 -c 50 http://localhost:8080/hello`<br/>
+**jmeter**：<br/>
+
+常用类:<br>
+AtomicInteger：的底层实现原理 
+1.通过循环获取最新的值<br>
+2.然后判断最新的值是否和主内存的值是否一致如果一致则更新(用第一步获取的最新的值+需要操作的数计算得出需要更新的值)`第二步骤是原子的`，如果不相等则循环继续获取底层最新的值再进入第二步骤**{计算机底层支持CAS指令compareAndSwapInt}**<br>
+
+```java
+ public final int getAndAddInt(Object var1, long var2, int var4) {
+        int var5;
+        do {
+            var5 = this.getIntVolatile(var1, var2);
+        } while(!this.compareAndSwapInt(var1, var2, var5, var5 + var4));
+
+        return var5;
+ }
+```
+AtomicBoolean：使用方法[compareAndSet]()该方法是原子的。可以保证线程只进入一次<br/>
+
+```java
+private static AtomicBoolean atomicBoolean = new AtomicBoolean(false);
+if (atomicBoolean.compareAndSet(false, true)) {
+ 		logger.info("保证只有一个线程进入");
+ }
+```
+
+**<font color=red>知识补充:Arrays.asList()不能把基本数据类型数组转换为集合</font>**
+
+```java
+要想把基本数据类型的数组转化为其包装类型的list，可以使用guava类库的工具方法，示例如下：
+int[] intArray = {1, 2, 3, 4};
+List<Integer> list = Ints.asList(intArray);
+
+asList方法返回的是数组的一个视图，对这个list的操作都会反映在原数组上，而且这个list是定长的，不支持add、remove等改变长度的方法。
+
+public class App {
+  public static void main(String[] args) {
+    int[] intArray = {1, 2, 3, 4};
+    List<Integer> list = Ints.asList(intArray);
+    list.set(0, 100);
+    System.out.println(Arrays.toString(intArray));
+    list.add(5);
+    list.remove(0);
+  }
+}
+result:
+[100, 2, 3, 4]
+UnsupportedOperationException
+UnsupportedOperationException
+```
+
+**保证原子性的几种方式对比:**
+
+>1.synchronized 不可能中断锁，适合竞争不激烈，可读性好
+
+> 2.Lock 可中断锁，多样化同步，竞争激烈时能维持常态
+
+> 3.Atomic 竞争激烈时能维持常态，比Lock性能好，但只能同步一个值
+
+Volatitle指令重排的禁用：
+
+```java
+在每个volatile写操作的前面插入一个StoreStore屏障。//{A}-->{C、B}
+在每个volatile写操作的后面插入一个StoreLoad屏障。//{A、C}--->{B}
+在每个volatile读操作的后面插入一个LoadLoad屏障。//{A、C}--->{B}
+在每个volatile读操作的后面插入一个LoadStore屏障。//{A、C}--->{B}
+```
+
+![volatile排序规则](/Users/mac/Desktop/学习笔记/image/volatile排序规则.png)
+
+<font color=red>总结：<br>对于volatile的写操作：写操作之前的所有操作均不能与当前变量重排序，写操作之后的volatile变量的读写操作不能与当前变量重排序<br>对于volatile的读操作：读操作之后的所有操作不能与当前变量重排序，读操作之前的volatile变量的读写操作不能与当前变量重排序<br>Normal Load指令与Normal store指令的规则是一致的(这句话的理解:当排序规则对普通写进行限制时，表示对普通的读和写保持一致的限制，当排序规则只说明对读限制，这时不对普通读写限制)</font>
+
+如果对一个普通变量设置volatile关键字，则在修改该变量之前的代码必须在该代码之前调用，同理如果
+
+该变量为一个对象的引用并对其进行赋值，那么在该引用赋值之前必须完成对象的初始化操作
+
+```java
+扩展:初始化对象过程
+1.分配内存空间
+2.初始化对象
+3.将对象内存地址赋值给引用变量
+由于JVM不保证2、3步骤的执行顺序，因此在多线程环境可能会获取到未被初始化的对象导致使用出错
+因此将该变量声明为volatitle则可以保证在其被赋值前(即声明为volatile变量的代码执行前)1、2步骤必须执行
+常见单例eg:
+private static volatile  ServiceDemo01 serviceDemo01 = null;
+if (serviceDemo01 == null) {
+  	synchronized (SingletonDemo.class) {
+    	if (serviceDemo01 == null) {
+      	serviceDemo01 = new ServiceDemo01();
+    	}
+   }
+}
+扩展：单例的另两种实现:
+1.通过静态内部类实现，jvm对加载类是线程阻塞的，并且只有在使用内部类的时候才会加载，这样保证了懒加载的实现。
+2.通过枚举实现单例
+/**
+* 使用枚举实现单例
+*/
+private enum SINGLETON {
+        INSTANCE;
+        private SingletonEnumDemo singletonEnumDemo;
+        /**
+         * JVM可以保证只会被初始化一次
+         */
+        SINGLETON() {
+            singletonEnumDemo = new SingletonEnumDemo();
+        }
+        public SingletonEnumDemo getSingletonEnumDemo() {
+            return singletonEnumDemo;
+        }
+}
+//调用:SINGLETON.INSTANCE.getSingletonEnumDemo();
+//这里类静态内部类 在访问SGINLETON枚举时会加载枚举类(线程堵塞)，并且调用枚举类的构造方法，因此在访问INSTANCE之前就已经调用完构造方法，因此不存在线程安全的问题
+```
+
+final指令重排：
+
+```java
+//对于构造函数中存在对声明为final的成员变量进行赋值时，JVM保证该构造函数中第三步(将对象地址赋值给引用变量)之前，会先对final变量进行赋值操作，即不会出现指令重排。
+```
+
+
+
+**静态代码块和静态域**
+
+以下代码执行结果为null
+
+```java
+static {
+  escape = new Escape();
+}
+private static Escape escape = null;
+public static void main(String[] args) {
+  System.out.println(escape);
+}
+```
+
+说明:<font color=red>静态变量 和static修改的静态代码块 运行的顺序是根据代码编写的先后,为了避免出现不必要的麻烦, 不管是否有在静态代码块中使用 静态变量， 都应当把静态变量写在 静态代码块的上方。</font>
+
+**final关键字**：
+
+声明为final的类与变量前加final关键字的本质区别：**final类生成的对象本身不允许修改，final声明的变量或引用表示变量或引用不允许修改。**
+
+1. **final类**产生的对象的引用是可以修改的，但是引用指向的**对象本身**的值是**不允许**修改的。eg:String、UnmodifiableMap
+2. final声明的变量**值或者引用**是**不允许修改**的，但是引用指向的对象本身的值是可以修改的，除非该对象也是一个final类对应的对象。
+
+
+
+**常见**线程不安全的类:
+
+1. StringBuilder，性能高但是不安全
+2. SimpleDateFormat，一个对象被多个线程访问时，线程不安全，会抛异常
+3. ArrayList、HashSet、HashMap等Collections
+
+**常见**线程安全的类:
+
+1. StringBuffer
+
+2. JodaTime提供的时间转换类
+
+   <font color=blue>**同步容器**:</font>
+
+3. ArrayList->Vector,Stack
+
+4. HashMap->HashTable
+
+5. Collections.synchronizedXXX()
+
+```java
+//StringBuffer源码
+public synchronized StringBuffer append(String str) {
+  toStringCache = null;
+  super.append(str);
+  return this;
+}
+
+/**
+ * 建议使用JodaTime提供的类DateTimeFormatter 进行日期转换
+ * 对比java自己提供的SimpleDatJeFormat
+ * 1.线程安全
+ * 2.优化更好
+*/
+DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("yyyy-mm-dd hh:mm:ss");
+DateTime.parse("2019-05-18 12:12:33",dateTimeFormatter).toDate());
+```
+
+总结:**同步容器也会出现线程安全的问题**
+
+1. vecotor虽然为线程安全的类，但是如果在多线程环境下类似if(condition(x)){get(x)}也会出现线程不安全的问题，因为if和方法体的逻辑不是原子的
+
+2. <font color=red>**在对集合进行遍历的时候不建议直接去做删除操作，即便是单线程环境。否则会报错。建议通过标记的方式，等集合遍历完成后再进行删除；**</font>eg:
+
+   ```java
+   private static Vector<Integer> vectors = new Vector<>();
+   private static void test01() {
+     for (Integer integer : vectors) {
+       if (integer == 30) {
+         vectors.remove(integer);
+       }
+     }
+   }
+   private static void test02() {
+     Iterator<Integer> iterator = vectors.iterator();
+     while (iterator.hasNext()) {
+       Integer value = iterator.next();
+       if (value == 30) {
+         vectors.remove(value);//通过iterator.remove()可以正确操作
+       }
+     }
+   }
+   private static void test03() {
+     for (int i = 0; i < vectors.size(); i++) {
+       if (vectors.get(i) == 30) {
+         vectors.remove(i);
+       }
+     }
+   }
+   public static void main(String[] args) {
+     vectors.add(10);
+     vectors.add(20);
+     vectors.add(30);
+     vectors.add(30);
+     //        test01();//ConcurrentModificationException
+     //        test02();//ConcurrentModificationException  
+     test03();//不会出现异常 但是会导致符合条件的未被删除(最后一个未被删除)
+     vectors.stream().forEach(System.out::println);
+   }
+   
+   /**
+    * 下面代码即使没有报错，也会导致第三个元素无法删除
+    *  如果把删除"2"的if逻辑注释，则执行下面代码也会报错
+    */
+   List<String> list = new ArrayList();
+   list.add("1");
+   list.add("2");
+   list.add("3");
+   for(String a:list){
+     if(a.equals("2")){
+       list.remove(a);
+     }
+     if(a.equals("3")){
+       list.remove(a);
+     }
+   }
+   list.stream().forEach(System.out::println);
+   
+   ```
+
+#### 并发容器J.U.C
+
+1. ArrayList->CopyOnWriteArrayList
+
+   缺点：写操作会进行copy数组，如果容器很大很容易出现gc；无法保证实时性的读取，只能保证最终一致性
+
+2. HashSet,TreeSet->CopyOnWriteArraySet,ConcurrentSkipListSet
+
+3. HashMap,TreeMap->ConcurrentHashMap,ConcurrentSkipListMap
+
+#### 安全共享对象策略-总结
+
+1. 线程限制：有线程独占，并且只能被占有它的线程修改
+
+2. 共享只读：可以被多个线程读取，任何线程都不允许修改它
+3. 线程安全对象：eg:ConcurrentHashMap
+4. 被守护的对象：只能通过获取特定的锁来访问
+
+#### AbstractQueuedSynchronizer - AQS
+
+- 四个状态
+
+  ```java
+  /**
+  CANCELLED 取消状态（需要从同步队列中取消等待）
+  SIGNAL 等待触发状态（后继节点的线程处于等待状态，如果当前线程释放了同步状态或者被取消，将会通知后继节点）
+  CONDITION 等待条件状态（节点在等待队列（不是同步队列）中，等待在Condition上，当其他线程对Condition调用signal()后，该节点会从等待队列中转移到同步队列中）
+  PROPAGATE 状态需要向后传播
+  INITIAL，值为0 ，初始状态
+  */
+  static final int CANCELLED =  1;
+  static final int SIGNAL    = -1;
+  static final int CONDITION = -2;
+  static final int PROPAGATE = -3;
+  volatile int waitStatus;
+  ```
+
+  
+
+1. CountDownLatch:计数字不允许修改
+
+   ```java
+   await()
+   await(long timeout, TimeUnit unit)//等待5秒还未结束则不再阻塞
+   ```
+
+2. Semaphore
+
+   ```java
+   acquire()
+   acquire(int permits)//表示一个线程需要获取多个许可才可以往下执行
+   tryAcquire()
+   tryAcquire(int permits)
+   tryAcquire(long timeout, TimeUnit unit)//尝试获取等待的时间 返回true or false
+   tryAcquire(int permits, long timeout, TimeUnit unit)
+   ```
+
+3. CyclicBarrier
+
+4. ReentrantLock
+
+   可重入性
+
+   锁的实现(通过JDK实现，synchronized通过JVM实现)
+
+   性能的区别：建议使用synchronized
+
+   功能区别：synchronized使用便捷，但力度控制没有后者细
+
+   独有功能：可指定是公平锁还是非公平锁；提供了一个Condition类，可以分组唤醒需要唤醒的线程；提供能够中断等待锁的线程机制，lock.lockInterruptibly()；
+
+5. ReentrantReadWriteLock:读写锁
+
+6. StampedLock:读写锁，且支持乐观锁，效率比ReentrantReadWriteLock更高；**StampedLock的读写锁均不可重入，所以当获取锁后释放锁前，不应该再调用会获取锁的操作，以避免产生死锁**
+
+   ```java
+   /**
+    * 下面的方法主要是保证了数据的一致性
+    * 为了保证x和y的值保持一致性 所以需要把x和y的值保存到栈内存的副本变量上（currentX，currentY）
+    * 如果不通过乐观锁（tryOptimisticRead）的话就无法保证数据一致性
+    * 可以保证在读多写少的场景中避免写饥饿的情况，因为如果进入到悲观读就说明一定是有写的操作发生了
+    * @return
+    */
+   double distanceFromOrigin() { // A read-only method
+     long stamp = sl.tryOptimisticRead();
+     double currentX = x, currentY = y;
+     if (!sl.validate(stamp)) {
+       stamp = sl.readLock();
+       try {
+         currentX = x;
+         currentY = y;
+       } finally {
+         sl.unlockRead(stamp);
+       }
+     }
+     return Math.sqrt(currentX * currentX + currentY * currentY);
+   }
+   
+   /**
+    * 乐观锁、写锁 也可以转换为写锁
+    * @param newX
+    * @param newY
+    */
+   void moveIfAtOrigin(double newX, double newY) { // upgrade
+     // Could instead start with optimistic, not read mode
+     long stamp = sl.readLock();
+     try {
+       while (x == 0.0 && y == 0.0) {
+         long ws = sl.tryConvertToWriteLock(stamp);
+         if (ws != 0L) {
+           stamp = ws;
+           x = newX;
+           y = newY;
+           break;
+         } else {
+           sl.unlockRead(stamp);
+           stamp = sl.writeLock();
+         }
+       }
+     } finally {
+       sl.unlock(stamp);
+     }
+   }
+   ```
+
+7. Condition
+
+8. FutureTask
+
+#### Fork/Join框架
+
+1. ForkJoinPool、RecursiveTask[(recursive:递归的)]()
+
+2. BockingQueue(阻塞队列) 生产消费 **实现类如下：**
+
+   ArrayBlockingQueue 先进先出(从尾部insert头部remove)
+
+   DelayQueue
+
+   LinkedBlockingQueue
+
+   PriorityBlockingQueue
+
+   SynchronousQueue:同步队列 只能放值一个元素
+
+### 线程池
+
+#### ExecutorService
+
+```java
+/**
+	* 核心线程数corePoolSize表示：随着工作的产生，每次都会创建一个新的线程，即便线程池中有空闲的线程，当工作		*	数大于核心线程数且核心线程没有空闲的线程来处理工作任务时，会将工作放入工作队列workQueue，直到工作队列满   	 * 为止，当工作队列塞满时，会去创建新的线程直到到达最大线程maximumPoolSize，则采取拒绝策略
+	* 设置keepAliveTime 表示当大于核心线程corePoolSize的线程在keepAliveTime指定时间未被使用则将其回收，	* 但是不会回收核心线程，除非显式指定需要回收核心线程allowsCoreThreadTimeOut
+	*/
+ScheduledExecutorService executorService = Executors.newScheduledThreadPool(5);
+/**
+ * 表示corePoolSize==maximumPoolSize==5 线程池中永远最多只有5个线程在运行
+ */
+Executors.newFixedThreadPool(5);
+/**
+ * 当有工作产生时如果线程中没有空闲线程则会去创建一个线程来处理，没有线程存放队列等待的情况，线程可能会无线增
+ * 长，每个线程默认的keepAliveTime为60秒
+ */
+Executors.newCachedThreadPool();
+/**
+ * 线程池中永远只有一个线程，且可以保证所有任务按指定的顺序执行
+ */
+Executors.newSingleThreadExecutor();
+```
+
+ScheduledExecutorService与Timer的区别
+
+1. 前者对于多个工作任务采用多线程，后置为单线程
+2. Timer出现异常会导致当前线程和其它工作线程中断
+3. 前者不能通过修改系统时间影响定时任务的执行时间
+4. Spring定时器底层原理本质是通过JUC的ScheduledExecutorService实现
+
+#### ExecutorService创建的线程为非守护线程
+
+直到所有线程都执行完成，JVM才会退出，也可以通过如下方式创建守护线程
+
+```java
+ExecutorService pool = Executors.newFixedThreadPool(1, 
+    new ThreadFactory() {  
+        public Thread newThread(Runnable r) {  
+            Thread thread = new Thread(r);  
+            thread.setDaemon(true);  
+            thread.setName(threadNamePrefix + thread.getId());
+            return thread;  
+        }  
+    });   
+```
+
+
+
+#### 死锁
+
+如何避免死锁：
+
+1. 代码顺序加锁
+2. 设置加锁超时 eg:ReentrantLock
+3. 死锁检测：通过代码实现
+
+建议：在涉及到并发的场景多记录log便于排查问题
+
+#### 多线程并发最佳实践
+
+* 使用本地变量
+* 使用不可变类
+* 最小化锁的作用范围：s=1/(1-a+a/n)
+* 使用线程池而不是new Thread
+* 宁可使用同步也不要使用wait和notify方法
+* 使用BlockingQueue实现生产-消费模式
+* 使用并发集合而不是加了锁的同步集合
+* 使用Semaphore创建有界的访问
+* 宁可使用同步代码块，也不使用同步的方法
+* 避免使用静态变量
+
+#### HashMap与ConcurrentHashMap
+
+
+
+## 总结：
+
+线程不安全的概念：**只要是有多个线程对同一个变量进行操作就有可能会出现线程安全问题**
+
+1. 线程将变量回写主内存时，该线程之前的运算不是基于回写那一刻主内存的值运算的结果
+
+   > 例如：i++ 两个线程均读到的是5 然后通过运算都将6回写     
+
+2. 一个线程在通过变量进行运算读取到另一个线程修改变量部分信息，导致计算结果不准确或异常
+
+   > 例如: SimpleDateFormat在多线程操作下会抛异常
+
+通过上面的描述可以总结为：
+
+1. 当前线程读到的变量值，另一个线程可能会修改当前同一个变量的值，需要考虑这种修改是否对当前线程的后序逻辑产生影响
+2. 一个线程修改变量，另一个线程读到有可能读到变量的中间状态值而出现线程安全问题
+
+```java
+if(a==true){
+  //在执行下面代码时a的值可能已经为false
+  doSomething...
+}
+
+int a = 0;
+void test(){
+// a=a+1;实际执行将分为三步
+c = a;//将a拷贝到寄存器  
+b=c+1;//在执行c+1时 可能a的值已经发生了变化
+a=b;//在执行a=b时 可能a的值已经发生了变化 
+}
+
+SimpleDateFormmat sdf = new SimpleDateFormt("yyyy-mm-dd");
+void test02(){
+  sdf.parse("2019-5-24");//在执行这段代码时，读取到的sdf对象的内部成员变量可能被另一个线程修改为中间状态值，导致执行时异常。
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
