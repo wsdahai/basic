@@ -1,0 +1,141 @@
+### 基础：
+
+1. hashCode和equals
+
+   eg1
+
+   代码中容易出错的点：重写equals而不重写hashCode在hashMap中的使用
+
+   ```java
+    @Test
+       public void testHashMap4() {
+           Map<String, Long> map = new HashMap<>();
+           String a1 = "abc";
+           String b1 = "a" + new String("bc");
+           map.put(a1, 1L);
+           map.put(b1, 1L);
+           System.out.println(a1==b1);//false
+           System.out.println(a1.hashCode() == b1.hashCode());//true
+           System.out.println(a1.equals(b1));//true
+           System.out.println(map.size());//1
+           System.out.println("Aa".hashCode()=="BB".hashCode());//true
+   
+       }
+   ```
+
+2. 常量池
+
+   eg1：
+
+   容易出错的点，判断两个基本类型包装类型是否相等==
+
+   ```java
+   @Test
+       public void testFinalPool01() {
+           Integer a = new Integer(1);
+           Integer b = new Integer(1);
+           System.out.println(a == b);//false
+   
+           Integer c = 100;
+           Integer d = 100;
+           /**
+            * 常量池中缓存了基本数据类型-128-127的包装类型值 也包含Boolean
+            */
+           System.out.println(c == d);//true
+           Boolean b1 = true;
+           Boolean b2 = true;
+           System.out.println("Boolean:" + (b1 == b2));//true
+   
+           //-128 - 127 缓存区大小
+           for (int i = -128; i <= 127; i++) {
+               Integer c11 = i;
+               Integer d11 = i;
+               if (c11 != d11) {
+                   System.out.println(c11 == d11);//不会输出
+               }
+           }
+           Integer c2 = 1200;
+           Integer d2 = 1200;
+           System.out.println(c2 == d2);//false
+           System.out.println(c2 == (d2 + new Integer(0)));//true
+       }
+   ```
+
+   eg2.
+
+   ```java
+   public static void main(String[] args) {
+           String a = "a";
+           String b = a+"b";
+           b.intern();
+           String c = "ab";
+           System.out.println(b==c);//1.6及之前为false  1.6之后为true
+   }
+   ```
+
+3. 内部类
+
+   ```java
+   public void method1() {
+           final Test test = new Test();
+           test0 = new Test() {
+               @Override
+               public void test() {
+                   System.out.println("匿名内部类：" + test);
+                   Field[] field = this.getClass().getDeclaredFields();
+                   for (int i = 0; i < field.length; i++) {
+                       System.out.println(field[i].getName());
+                   }
+               }
+           };
+           InnerFinalTest ift = new InnerFinalTest();
+           ift.innerFinalTest(test0);
+           System.out.println("外部直接访问变量：" + test);
+       }
+   
+       public void innerFinalTest(Test test) {
+           test.test();
+       }
+   ```
+
+4. 赋值与方法传参
+
+   ```java
+   public class ReferenceDemo01 {
+   
+       public static void main(String[] args) {
+           ReferenceDemo01 referenceDemo01 = new ReferenceDemo01();
+           referenceDemo01.test01(referenceDemo01);
+           System.out.println(referenceDemo01);
+   
+       }
+   
+       public static void test01(ReferenceDemo01 demo01){
+           demo01= null;
+           System.out.println("test01:"+demo01);
+       }
+   }
+   ```
+
+5. 异常
+
+   ```java
+    /**
+        * RuntimeException 可以不被catch
+        * @throws RuntimeException
+        */
+       private static void test01() throws  RuntimeException{
+       }
+   ```
+
+6. 动态代理和反射
+
+   - 框架中的应用
+     - spring aop 、ioc、spring事务
+     - mybatis
+     - dubbo、、、、
+
+   - 代码查看
+     - aop
+     - 事务
+     - mybatis
