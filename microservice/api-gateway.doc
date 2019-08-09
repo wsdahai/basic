@@ -1,0 +1,249 @@
+2017年10月12日星期四
+API网关登录认证规范
+1.	基于服务验证的登录
+APP发起登录验证求，由系统某个微服务（例如融合的resource服务）进行验证并返回用户信息（中间要经过appKey和appSecret的验证）。
+A.	登录处理流程
+i.	APP发起POST登录请求，请求URL为：HTTPS://云接入域名/user/auth/login（通常APP运行在互联网环境，通过移动接入框架的外网域名访问API网关，强烈建议在APP端嵌入SDK。详细信息参考：涅槃HTTP框架。）
+ii.	登录请求到达网关之后，API网关先通过调用APP-Manager服务验证appKey和appSecret。
+iii.	appKey验证通过之后，根据appKey找到对应的登录验证服务地址（例如：/airapp/auth/login），并将登录请求转发给登录验证服务。
+iv.	API网关根据调用登录验证服务返回数据，做如下两个处理：
+1.	生成Token，并将此返回数据的body内容obj.res中的部分字段数据保存到缓存中：
+a.	id、userid或者userId字段数据作为userid；
+b.	username或者userName字段数据作为username；
+c.	bizAreaCode或者distCode字段数据作为distcode；
+d.	netCode字段数据作为netcode；
+e.	userUpdateFlag字段数据作为userupdateflag。
+2.	在登录验证服务返回数据中添加token字段，作为登录验证请求的响应返回给APP，作为APP后续业务请求的身份校验凭证。
+v.	在后续APP访问其他微服务接口时（在服务治理平台配置不需要验证Token的接口除外），APP需要在请求头中添加token字段，请求经过API网关转发时，API网关会讲token解析成用户数据并添加在HTTP请求头中：
+1.	在登录时APP的appKey会成为请求头中的sgs-appkey；
+2.	在登录时APP的deviceId会作为请求头中的sgs-deviceid；
+3.	在登录时如果保存了userid会作为请求头中的sgs-userid；
+4.	在登录时如果保存了username会作为请求头中的sgs-username；
+5.	在登录时如果保存了distcode会作为请求头中的sgs-distcode；
+6.	在登录时如果保存了netcode会作为请求头中的sgs-netcode；
+7.	在登录时如果保存了userupdateflag会作为请求头中的userupdateflag；
+ 
+
+B.	APP登录验证求格式
+i.	APP登录请求body数据为JSON格式，需要包含appKey、appSecret、deviceId（不同设备不能相同）和其他用于用户登录身份验证的字段数据。
+ii.	登录请求示例：
+{
+    "deviceId":"863185030466382",
+    "appKey":"unite",
+    "userName":"835895",
+    "appSecret":"unite******",
+    "password":"II23s23123f23g1c1v2"
+}
+
+C.	登录验证服务接口
+i.	接口地址规范：/sytem/auth/login 其中第一级system需要修改为系统名。
+ii.	登录接口响应数据为json格式，需要包含success和obj字段，用户信息数据在obj.res下。
+iii.	登录响应示例：
+{
+    "version":null,
+    "requestId":null,
+    "errorMessage":null,
+    "business":null,
+    "success":true,
+    "date":"2017-10-12 18:18:02",
+    "obj":{
+        "openId":"837090",
+        "o2oRes":null,
+        "source":"4",
+        "isO2OAuth":false,
+        "res":{
+            "longitude":null,
+            "workMobile":"+8618588259456",
+            "isOnlineExam":false,
+            "sfPayId":null,
+            "positionName":"收派员",
+            "mobile":"19700044360",
+            "areaId":null,
+            "serviceDbAreaCode":"755Y",
+            "sex":null,
+            "deptCode":"755Q",
+            "phoneAreaCode":"0086",
+            "address":null,
+            "idCard":null,
+            "isLocked":false,
+            "id":"73-1-755020655132409856",
+            "buid":"837090",
+            "deptName":"田贝花园速运营业部",
+            "isPwdChanged":true,
+            "deliverQuantity":2,
+            "netCode":"755Q",
+            "distCode":"755",
+            "latitude":null,
+            "source":"4",
+            "areaCode":"755Y",
+            "divisionCode":"755Q",
+            "groupCode":null,
+            "bizAreaCode":null,
+            "status":0,
+            "isPwdChange":null,
+            "empNum":"837090",
+            "userLevel":0,
+            "openId":"837090",
+            "fullName":"837090",
+            "personId":null,
+            "groupId":null,
+            "type":"1",
+            "username":"837090",
+            "permissions":null,
+            "groupType":null
+        },
+    },
+    "errorCode":null,
+    "params":null
+}
+
+iv.	API网关添加token之后：
+{
+    "version":null,
+    "requestId":null,
+    "errorMessage":null,
+    "business":null,
+    "success":true,
+    "date":"2017-10-12 18:18:02",
+    "obj":{
+        "openId":"837090",
+        "o2oRes":null,
+        "source":"4",
+        "isO2OAuth":false,
+        "res":{
+            "longitude":null,
+            "workMobile":"+8618588259456",
+            "isOnlineExam":false,
+            "sfPayId":null,
+            "positionName":"收派员",
+            "mobile":"19700044360",
+            "areaId":null,
+            "serviceDbAreaCode":"755Y",
+            "sex":null,
+            "deptCode":"755Q",
+            "phoneAreaCode":"0086",
+            "address":null,
+            "idCard":null,
+            "isLocked":false,
+            "id":"73-1-755020655132409856",
+            "buid":"837090",
+            "deptName":"田贝花园速运营业部",
+            "isPwdChanged":true,
+            "deliverQuantity":2,
+            "netCode":"755Q",
+            "distCode":"755",
+            "latitude":null,
+            "source":"4",
+            "areaCode":"755Y",
+            "divisionCode":"755Q",
+            "groupCode":null,
+            "bizAreaCode":null,
+            "status":0,
+            "isPwdChange":null,
+            "empNum":"837090",
+            "userLevel":0,
+            "openId":"837090",
+            "fullName":"837090",
+            "personId":null,
+            "groupId":null,
+            "type":"1",
+            "username":"837090",
+            "permissions":null,
+            "groupType":null
+        },
+        "token":"74681b4f513fa9d63ed781b6744dbb46"
+    },
+    "errorCode":null,
+    "params":null
+}
+2.	基于CAS验证的登录
+APP先访问CAS服务器获取Ticket，再通过云接入访问向API网关发起登录请求，API网关拿Ticket去对应的CAS服务器验证用户登录请求（中间要经过appKey和appSecret的验证），再向系统某个微服务（例如融合的resource服务）获取用户信息。
+A.	登录处理流程
+i.	APP访问CAS服务器获取Ticket，具体过程示例如下：
+
+ii.	APP发起POST登录请求，请求URL为：HTTPS://云接入域名/user/cas/login 
+iii.	APP登录请求到达网关之后，API网关先通过调用APP-Manager服务验证appKey和appSecret。
+iv.	appKey验证通过之后，访问CAS服务器验证Ticket获得buid。
+v.	API网关根据appKey找到对应的获取用户信息服务地址（例如：/airapp/ res/getResource），并通过buid请求用户信息数据。
+vi.	后续过程与上一节“基于服务验证的登录”过程一致，不再赘述。
+ 
+
+B.	APP登录验证求格式
+i.	APP登录请求body数据为JSON格式，需要包含appKey、appSecret、deviceId（不同设备不能相同）、ticket和service字段。
+ii.	登录请求示例：
+{
+    "deviceId":"863185030466382",
+    "appKey":"unite",
+    "ticket":"ST-2847-PNqlOdZrddmdLWYfkNQZ-mt",
+    "appSecret":"unite123456",
+    "service":"https://sgs-gw-lvs.sit.sf-express.com"
+}
+
+C.	登录获取用户信息数据服务接口
+i.	接口地址规范：/sytem/res/ getResource其中第一级system需要修改为系统名。
+ii.	登录接口响应数据为json格式，需要包含success和obj字段，用户信息数据在obj.res下。
+iii.	API网关在验证Ticket通过之后，发起POST请求，查询用户登录数据请求格式为：
+{
+    "buid":"835895"
+}
+iv.	请求登录用户数据接口响应数据为json格式，需要包含success和obj字段，用户信息数据在obj.res下（数据格式以及后续处理与上一节“基于服务验证的登录”一致）。
+v.	请求登录用户数据响应示例：
+{
+    "version":null,
+    "requestId":null,
+    "errorMessage":null,
+    "business":null,
+    "success":true,
+    "date":"2017-10-12 18:18:02",
+    "obj":{
+        "openId":"837090",
+        "o2oRes":null,
+        "source":"4",
+        "isO2OAuth":false,
+        "res":{
+            "longitude":null,
+            "workMobile":"+8618588259456",
+            "isOnlineExam":false,
+            "sfPayId":null,
+            "positionName":"收派员",
+            "mobile":"19700044360",
+            "areaId":null,
+            "serviceDbAreaCode":"755Y",
+            "sex":null,
+            "deptCode":"755Q",
+            "phoneAreaCode":"0086",
+            "address":null,
+            "idCard":null,
+            "isLocked":false,
+            "id":"73-1-755020655132409856",
+            "buid":"837090",
+            "deptName":"田贝花园速运营业部",
+            "isPwdChanged":true,
+            "deliverQuantity":2,
+            "netCode":"755Q",
+            "distCode":"755",
+            "latitude":null,
+            "source":"4",
+            "areaCode":"755Y",
+            "divisionCode":"755Q",
+            "groupCode":null,
+            "bizAreaCode":null,
+            "status":0,
+            "isPwdChange":null,
+            "empNum":"837090",
+            "userLevel":0,
+            "openId":"837090",
+            "fullName":"837090",
+            "personId":null,
+            "groupId":null,
+            "type":"1",
+            "username":"837090",
+            "permissions":null,
+            "groupType":null
+        },
+    },
+    "errorCode":null,
+    "params":null
+}
+
+
