@@ -1,0 +1,197 @@
+Hibernate
+一.简介：
+1.Hibernate是一个开放源代码的对象关系映射框架，它对JDBC进行了非常轻量级的对象封装，它将POJO与数据库表建立映射关系，是一个全自动的orm框架，自动生成SQL语句，自动执行。
+2.Hibernate可以应用在任何使用JDBC的场合，既可以在Java的客户端程序使用，也可以在Servlet/JSP的Web应用中使用， 还可以在应用EJB的JaveEE架构中取代CMP，完成数据持久化。
+
+ 
+
+hibernate工作原理：
+1、通过Configuration().configure();读取并解析hibernate.cfg.xml 配置文件。
+2、由hibernate.cfg.xml中的<mappingresource="com/xx/User.hbm.xml"/>读取解析映射信息。
+3、通过config.buildSessionFactory();//得到sessionFactory。
+4、sessionFactory.openSession();//得到session。
+5、session.beginTransaction();//开启事务。
+6、persistent operate;
+7、session.getTransaction().commit();//提交事务
+8、关闭session;
+9、关闭sessionFactory;
+ 
+
+
+二.核心API
+Hibernate的API一共有6个，分别为: Configuration，SessionFactory ，Session、Query、Criteria ，Transaction。通过这些接口，可以对持久化对象进行存取、事务控制。
+1.	Configure
+ 
+2.SessionFactory
+SessionFactory对象: 
+SessionFactory代表数据库存储源。根据Hibernate配置文件创建对应的数据库存储源。
+SessionFactory对象创建后，和Configuration对象再无关联。修改Configuration包含的配置文件信息，不会对SessionFactory有任何影响。   
+获取SessionFactory对象：new Configuration().configure().buildSessionFactory();
+对象的缓存很大，就称为重量级对象。SessionFactory存放了Hibernate配置信息，映射元数据信息等。是重量级对象。 
+openSession方法  创建一个Session对象
+getCurrentSession方法  创建Session对象或取出Session对象
+
+3.Session
+Session接口负责执行被持久化对CRUD操作(CRUD的任务是完成与数据库的交流，包含了很多常见的SQL语句)。但需要注意的是Session对象线程安全的同时，Hibernate的Session不同于JSP应用中的HttpSession。这个session，指的是Hibernate中的session，而HttpSession对象应称为用户session。
+**　Session是Hibernate最重要的对象，Session维护了一个连接（Connection），只要使用Hibernate操作数据库，都需要用到Session对象
+
+4.Query
+Query接口让你方便地对数据库及持久对象进行查询，它可以有两种表达方式：HQL语言或本地数据库的SQL语句。Query经常被用来绑定查询参数、限制查询记录数量，并最终执行查询操作。
+
+5.Criteria
+Criteria接口与Query接口非常类似，允许创建并执行面向对象的标准化查询。Criteria接口也是轻量级的，它不能在Session之外使用。
+
+6.Transaction
+应用程序用来指定原子操作单元范围的对象，它是单线程的，生命周期很短。它通过抽象将应用从底层具体的、以及事务隔离开。
+transient(瞬时状态)，persistent(持久化状态)以及detached(离线状态)
+
+
+
+三.hibernate常规用法
+３.１更新操作
+我们使用save(Objcet o)方法，调用这个方法就把对象保存在数据库之中了。Session对象还提供着其他的方法来进行对数据库的更新
+•	session.save(obj); 【保存一个对象】
+•	session.update(obj); 【更新一个对象】
+•	session.saveOrUpdate(obj); 【保存或者更新的方法】
+３.２主键查询
+通过主键来查询数据库的记录，从而返回一个JavaBean对象
+•	session.get(javaBean.class, int id); 【传入对应的class和id就可以查询】
+•	session.load(javaBean.class, int id); 【支持懒加载】
+load()或get()方法：从数据库查找指定对象
+load()和get()的区别
+我们使用get查询时发现控制台会立马打出查询语句。
+使用load查询时控制台不会打印查询语句。
+get方法被调用时立刻发送sql语句到数据库进行查询。
+load方法被调用时并没有查询数据库，当我们需要使用查询的对象时，才去查询，所以当我们打印对象时，才会在控制台打印sql语句。
+get（）的原理 
+程序调用get方法，Hibernate发送sql语句到数据库
+数据库返回结果，Hibernate将结果封装成对象，返回对象到程序。
+load（）的原理
+程序调用load方法，Hibernate使用代理技术，创建一个代理对象，属性只有ID值。
+然后返回代理对象给程序，我们使用对象时，代理对象调用Hibernate查询数据库，初始化其他属性。
+注意：懒加载（延迟加载） 
+懒加载FatchType.LAZY也称为延迟加载，是Hibernate3关联关系对象默认的加载方式，所谓懒加载就是当在真正需要数据的时候，才真正执行数据加载操作。简单理解为，只有在使用的时候，才会发出sql语句进行查询。
+懒加载的有效期是在session打开的情况下，当session关闭后，会报异常。当调用load方法加载对象时，返回代理对象，等到真正用到对象的内容时才发出sql语句。 
+急加载FatchType.EAGER 也成为立即加载，时立即执行sql语句。
+在session没有关闭的之前，如果访问除id外的其他属性才会发sql语句去查询，我们经常犯的一个错误就是在当前session关闭以后访问由load（）加载的对象的非id属性，
+此时Hibernate尝试通过当前session发sql查询，但发现session已经关闭，这样就会发出no session的异常 。
+ 
+3.3 HQL查询
+HQL:hibernate query language 即hibernate提供的面向对象的查询语言
+•	查询的是对象以及对象的属性（它查询的是对象以及属性，因此是区分大小写的！ ）
+例：定义了三个类，Special、Classroom、Student来做测试，Special与Classroom是一对多，Classroom与Student是一对多的关系
+Special类：
+ 
+Classroom类：
+ 
+Student类：
+ 
+1.	最简单的查询
+List<Special> specials = (List<Special>)session.createQuery("select spe from Special spe").list();
+2.	基于 ? 的参数化形式
+//查询中使用?，通过setParameter的方式可以防止sql注入jdbc的setParameter的下标从1开始，hql的下标从0开始
+List<Student> students = (List<Student>)session.createQuery("select stu from Student stu where name like ?").setParameter(0, "%刘%").list();
+3.	基于 :xx 的别名的方式设置参数
+ 
+4.	如果返回的值只有一个，可以使用uniqueResult方法
+ 
+5.	基于投影的查询
+ 
+6.	基于导航对象的查询
+ 
+7.	使用 in 进行列表查询
+ 
+8.	分页查询
+ 
+9.	内连接查询
+ 
+ 
+10.	左外连和右外连查询
+ 
+11.	创建DTO类，将查询出来的多个字段可以存放到DTO对象中去
+ 
+12.	group having字句
+ 
+
+3.4 SQL：Struct query language 结构化查询语言
+•	查询的是表以及列【不区分大小写】
+•	使用SQL查询可以利用某些数据库的特性，或者将原有的JDBC应用迁移到hibernate应用上，也可能需要使用原生的SQL查询。查询步骤如下：
+•	1、获取hibernate session对象
+•	2、编写SQL语句
+•	3、以SQL语句作为参数，调用Session的createSQLQuery()方法创建查询对象
+•	4、调用SQLQuery对象的addScalar()huoaddEntity()方法将选出的结果与标量值或实体进行关联，分别用于进行标量查询或实体查询
+•	5、如果SQL语句有参数，则调用Query的setXxx()方法为参数赋值
+•	6、调用Query的list()方法或uniqueResult()方法返回查询的结果集
+3.4.1、标量查询
+•	1.标量查询会获得数据表列对应的Object数组组成的List，hibernate会默认通过ResultSetMetadata来判定所返回数据列的实际顺序和类型，但这样的默认处理会降低程序性能，因此在代码书写时建议明确返回值类型
+ 
+
+2.多表查询
+ 
+3.4.2.实体查询
+1.如果查询返回了某个数据表的全部数据列，且该数据表有对应的持久化类映射，就可用实体查询将查询结果转换成实体
+ 
+
+2.多表查询(使用这种查询，如果两张表中有相同字段，则得到这两字段值均为顺序在前的字段的值，解决办法是将表中名称相同字段名称做区别) 
+ 
+3.4.3 关联查询
+ 
+注意：两个表中字段名称不能重复，否则得到结果的相同名称字段的值会出现混淆（只取顺序排在前面的字段值）
+
+
+3.5 QBC查询
+QBC查询: query by criteria 完全面向对象的查询
+在Hibernate应用中使用QBC查询通常经过3个步骤 
+ (1)使用Session实例的createCriteria()方法创建Criteria对象 
+ (2)使用工具类Restrictions的相关方法为Criteria对象设置查询对象 
+ (3)使用Criteria对象的list()方法执行查询，返回查询结果
+
+3.5.1  Restrictions用法：
+ 
+ 
+3.5.2  Order提供设置排序方式：
+ 
+ 
+3.5.3  Projections提供对查询结果进行统计与分组操作： 
+ 
+ 
+3.5.4  QBC分页查询
+ 
+
+
+
+四．缓存
+4.1  Hibernate的三种状态：
+1.	瞬时状态：
+当我们通过Java的new关键字来生成一个实体对象时，这时这个实体对象就处于自由状态，此时该对象只是通过JVM获得了一块内存空间，还并没有通过Session对象的save()方法保存进数据库，因此也就还没有纳入Hibernate的缓存管理中，也就是说该对象现在还自由的游荡于Hibernate缓存管理之外。所以我们可以看出自由对象最大的特点就是，在数据库中不存在一条与它对应的记录。
+瞬时状态特点：
+1：不和session实例关联
+2.在数据库中没有和瞬时对象关联的记录
+
+2.	持久状态
+持久化对象就是已经被保存进数据库的实体对象，并且这个实体对象现在还处于Hibernate的缓存管理之中。这是对该实体对象的任何修改，都会在清理缓存时同步到数据库中。
+ 持久状态特点：
+1：session实例关联
+2.在数据库中有和持久对象关联的记录
+
+3.	游离状态
+当一个持久化对象，脱离开Hibernate的缓存管理后，它就处于游离状态，游离对象和自由对象的最大区别在于，游离对象在数据库中可能还存在一条与它对应的记录，只是现在这个游离对象脱离了Hibernate的缓存管理，而自由对象不会在数据库中出现与它对应的数据记录。
+脱管对象特点：
+1：本质和瞬时对象相同
+2.	只是比瞬时对象多了一个数据库记录的标识值id
+
+三种状态相互转化的状态图如下：
+ 
+
+4.2  Hibernate执行update操作会访问数据库几次
+ 
+
+
+4.2  Hibernate中一级缓存和二级缓存
+ 
+
+ 
+  
+ 
+ 
+ 
